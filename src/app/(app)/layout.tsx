@@ -9,6 +9,10 @@ const NAV_LINKS = [
   { href: "/", label: "Inicio" },
   { href: "/inventario/productos", label: "Productos" },
   { href: "/inventario/categorias", label: "Categorías" },
+  { href: "/inventario/movimientos", label: "Movimientos" },
+  { href: "/inventario/kardex", label: "Kardex" },
+  { href: "/inventario/ajustes", label: "Ajustes" },
+  { href: "/inventario/almacenes", label: "Almacenes" },
 ];
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -16,10 +20,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="flex min-h-svh flex-col">
-      <header className="border-border flex items-center justify-between gap-4 border-b px-6 py-3">
-        <div className="flex items-center gap-6">
+      <header className="border-border flex flex-wrap items-center justify-between gap-4 border-b px-6 py-3">
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
           <span className="text-sm font-semibold">Wave</span>
-          <nav className="flex gap-4">
+          <nav className="flex flex-wrap gap-4">
             {NAV_LINKS.map((link) => (
               <Link
                 key={link.href}
