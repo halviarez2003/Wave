@@ -3,6 +3,7 @@ import "server-only";
 import type { ScopedPrisma } from "@/lib/prisma";
 import * as inventoryService from "@/server/modules/inventory/service";
 import * as financeService from "@/server/modules/finance/service";
+import { nextDocumentNumber } from "@/server/modules/shared/document-sequence";
 
 import type { createPurchaseSchema, payPayableSchema } from "./schema";
 import type { z } from "zod";
@@ -31,17 +32,6 @@ export async function getPurchase(db: ScopedPrisma, purchaseId: string) {
       payable: { include: { payments: { include: { account: true } } } },
     },
   });
-}
-
-async function nextPurchaseNumber(
-  tx: Pick<ScopedPrisma, "documentSequence">,
-  companyId: string,
-) {
-  const updated = await tx.documentSequence.update({
-    where: { companyId_type: { companyId, type: "PURCHASE" } },
-    data: { nextNumber: { increment: 1 } },
-  });
-  return updated.nextNumber - 1;
 }
 
 type CreatePurchaseInput = z.infer<typeof createPurchaseSchema>;
@@ -77,7 +67,7 @@ export async function createPurchase(
     const paidTotal = requestedPayment;
     const balanceDue = total - paidTotal;
 
-    const number = await nextPurchaseNumber(tx, companyId);
+    const number = await nextDocumentNumber(tx, companyId, "PURCHASE");
 
     const purchase = await tx.purchase.create({
       data: {

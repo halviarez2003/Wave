@@ -15,6 +15,8 @@ const NAV_LINKS = [
   { href: "/inventario/almacenes", label: "Almacenes" },
   { href: "/compras", label: "Compras" },
   { href: "/proveedores", label: "Proveedores" },
+  { href: "/ventas", label: "Ventas" },
+  { href: "/clientes", label: "Clientes" },
 ];
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {

@@ -2,6 +2,7 @@ export const PERMISSIONS = [
   { code: "sales.create", description: "Registrar ventas" },
   { code: "sales.editPrice", description: "Cambiar el precio de venta en el carrito" },
   { code: "sales.void", description: "Anular una venta completada" },
+  { code: "sales.collect", description: "Registrar cobros de cuentas por cobrar" },
   { code: "costs.view", description: "Ver costos y márgenes de utilidad" },
   { code: "purchases.create", description: "Registrar compras" },
   { code: "purchases.pay", description: "Registrar pagos de una compra" },
@@ -46,6 +47,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<SeedRole, PermissionCode[]> = {
   CONTABILIDAD: [
     "costs.view",
     "purchases.pay",
+    "sales.collect",
     "accounts.transfer",
     "accounts.manage",
     "expenses.create",
