@@ -205,6 +205,17 @@ siempre de la sesión, nunca de un parámetro de la request. Esto hace
 estructuralmente imposible una fuga de datos entre empresas por olvido de
 un filtro, incluso con una sola empresa activa hoy.
 
+> Corrección (Fase 6): la extensión inyecta `companyId` en tiempo de
+> ejecución, pero los tipos que Prisma genera para `create`/`createMany`
+> siguen exigiendo el campo `companyId` en el `data` (es un scalar
+> obligatorio sin `@default`, y `$extends` no cambia la firma estática de
+> los métodos). Por eso todo `service.ts` que crea una fila de un modelo de
+> empresa recibe `companyId` como parámetro explícito además del cliente
+> `db` — la extensión igual valida en runtime que coincida con la sesión
+> (`MissingTenantScopeError` si no). Confirmado con una transacción real
+> contra Postgres que la extensión sí se propaga dentro de
+> `db.$transaction(tx => ...)`.
+
 ## 5. Cómo se resuelven los flujos críticos
 
 - **Inventario por cantidad:** `InventoryBalance` guarda `quantity` y
