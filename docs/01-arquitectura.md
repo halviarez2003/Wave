@@ -87,10 +87,24 @@ Next.js 14 (App Router) + TypeScript estricto
 
 Clerk es más rápido de integrar, pero es un servicio externo de pago que
 almacena identidad fuera de nuestra base de datos multi-tenant. Auth.js v5
-con `Credentials` + `PrismaAdapter` mantiene usuario/empresa/rol en el mismo
+con el provider `Credentials` mantiene usuario/empresa/rol en el mismo
 esquema, sin costo recurrente ni dependencia externa, y es igual de seguro
 (bcrypt + JWT firmado). Se puede añadir OAuth (Google) después sin tocar el
 modelo de datos.
+
+> Corrección (Fase 5): el diseño original mencionaba `@auth/prisma-adapter`.
+> Se descartó: Auth.js exige estrategia `jwt` en cuanto hay un provider
+> `Credentials` (no soporta sesiones de BD con login por contraseña), y el
+> adapter existe sobre todo para gestionar cuentas OAuth y sesiones en BD —
+> ninguna de las dos aplica aquí. Usarlo habría exigido añadir las tablas
+> `Account`/`Session`/`VerificationToken` propias de Auth.js sin necesitarlas.
+> `authorize()` consulta `User` directamente con Prisma; el estado de sesión
+> vive solo en el JWT (`companyId`, `roleId`, `permissions`).
+
+> Nota (Fase 5): Next.js 16 renombró `middleware.ts` a **`proxy.ts`** (y la
+> función exportada de `middleware` a `proxy`/default export) — ver
+> `node_modules/next/dist/docs/.../file-conventions/proxy.md`. El archivo de
+> protección de rutas del proyecto es `src/proxy.ts`, no `middleware.ts`.
 
 ### 3.2 Por qué Server Actions como vía principal de escritura
 
@@ -110,6 +124,9 @@ integraciones externas futuras.
   seed.ts
 
 /src
+  auth.ts              (config Auth.js — providers, callbacks, jwt)
+  proxy.ts             (protección de rutas; reemplaza a middleware.ts en Next 16)
+
   /app
     /(auth)/login
     /(app)/dashboard
@@ -152,9 +169,8 @@ integraciones externas futuras.
 
   /lib
     prisma.ts          (singleton + client extension multi-tenant)
-    decimal.ts          (helpers Decimal)
-    permissions.ts      (matriz de permisos por rol, seed)
-    auth.ts             (config Auth.js)
+    permissions.ts      (catálogo de permisos + matriz por rol)
+    dal.ts              (getSession/requireSession/hasPermission)
 
   /components
     /ui                (shadcn)
