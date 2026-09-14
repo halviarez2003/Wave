@@ -103,6 +103,8 @@ export async function addSerializedUnitsAction(
   const variantId = formData.get("variantId") as string;
   const warehouseId = formData.get("warehouseId") as string;
   const unitsRaw = formData.get("unitsJson");
+  const purchaseItemId = formData.get("purchaseItemId") as string | null;
+  const purchaseId = formData.get("purchaseId") as string | null;
 
   let unitsJson: unknown;
   try {
@@ -125,10 +127,13 @@ export async function addSerializedUnitsAction(
       parsed.data.variantId,
       parsed.data.warehouseId,
       parsed.data.units,
+      purchaseItemId && purchaseId ? { purchaseItemId, purchaseId } : undefined,
     );
   } catch {
     return { error: "Alguna unidad tiene un IMEI o serial ya registrado." };
   }
+
+  if (purchaseId) revalidatePath(`/compras/${purchaseId}`);
 
   revalidatePath(`/inventario/ajustes/${variantId}`);
   revalidatePath(`/inventario/kardex/${variantId}`);

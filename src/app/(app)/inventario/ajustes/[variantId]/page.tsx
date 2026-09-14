@@ -26,10 +26,18 @@ const UNIT_STATUS_LABELS: Record<string, string> = {
 
 export default async function AjustesDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ variantId: string }>;
+  searchParams: Promise<{
+    purchaseId?: string;
+    purchaseItemId?: string;
+    warehouseId?: string;
+    defaultCost?: string;
+  }>;
 }) {
   const { variantId } = await params;
+  const purchaseContext = await searchParams;
   const session = await requireSession();
   const db = getScopedPrisma(session.user.companyId);
 
@@ -45,8 +53,11 @@ export default async function AjustesDetailPage({
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 px-6 py-10">
       <div>
-        <Link href="/inventario/ajustes" className="text-muted-foreground text-sm hover:underline">
-          ← Ajustes
+        <Link
+          href={purchaseContext.purchaseId ? `/compras/${purchaseContext.purchaseId}` : "/inventario/ajustes"}
+          className="text-muted-foreground text-sm hover:underline"
+        >
+          {purchaseContext.purchaseId ? "← Volver a la compra" : "← Ajustes"}
         </Link>
         <h1 className="mt-1 text-xl font-semibold tracking-tight">{label}</h1>
         <p className="text-muted-foreground text-sm">
@@ -55,6 +66,11 @@ export default async function AjustesDetailPage({
             Ver kardex
           </Link>
         </p>
+        {purchaseContext.purchaseId && (
+          <p className="text-muted-foreground mt-1 text-xs">
+            Las unidades que agregues aquí quedarán enlazadas a esa compra.
+          </p>
+        )}
       </div>
 
       {variant.product.inventoryType === "QUANTITY" ? (
@@ -135,7 +151,17 @@ export default async function AjustesDetailPage({
             </Table>
           </div>
 
-          <AddUnitsForm variantId={variant.id} warehouses={warehouses} />
+          <AddUnitsForm
+            variantId={variant.id}
+            warehouses={
+              purchaseContext.warehouseId
+                ? warehouses.filter((w) => w.id === purchaseContext.warehouseId)
+                : warehouses
+            }
+            purchaseId={purchaseContext.purchaseId}
+            purchaseItemId={purchaseContext.purchaseItemId}
+            defaultCost={purchaseContext.defaultCost}
+          />
         </>
       )}
     </main>

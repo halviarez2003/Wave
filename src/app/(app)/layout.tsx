@@ -13,6 +13,8 @@ const NAV_LINKS = [
   { href: "/inventario/kardex", label: "Kardex" },
   { href: "/inventario/ajustes", label: "Ajustes" },
   { href: "/inventario/almacenes", label: "Almacenes" },
+  { href: "/compras", label: "Compras" },
+  { href: "/proveedores", label: "Proveedores" },
 ];
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {

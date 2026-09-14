@@ -225,6 +225,7 @@ export async function addSerializedUnits(
   variantId: string,
   warehouseId: string,
   units: NewUnitRow[],
+  purchaseContext?: { purchaseItemId: string; purchaseId: string },
 ) {
   return db.$transaction(async (tx) => {
     const created = [];
@@ -234,6 +235,7 @@ export async function addSerializedUnits(
           companyId,
           productVariantId: variantId,
           warehouseId,
+          purchaseItemId: purchaseContext?.purchaseItemId,
           imei1: unit.imei1 || undefined,
           imei2: unit.imei2 || undefined,
           serial: unit.serial || undefined,
@@ -254,13 +256,15 @@ export async function addSerializedUnits(
           productVariantId: variantId,
           inventoryUnitId: inventoryUnit.id,
           warehouseId,
-          type: "MANUAL_IN",
+          type: purchaseContext ? "PURCHASE" : "MANUAL_IN",
           quantity: 1,
           stockBefore: 0,
           stockAfter: 1,
           unitCost: unit.cost,
           totalValue: unit.cost,
-          reason: "Alta de unidad serializada",
+          relatedDocumentType: purchaseContext ? "PURCHASE" : undefined,
+          relatedDocumentId: purchaseContext?.purchaseId,
+          reason: purchaseContext ? "Recepción de compra" : "Alta de unidad serializada",
           userId,
         },
       });
@@ -268,6 +272,74 @@ export async function addSerializedUnits(
       created.push(inventoryUnit);
     }
     return created;
+  });
+}
+
+/**
+ * Recibe cantidad de un producto no serializado dentro de una compra:
+ * recalcula el costo promedio ponderado del almacén y registra el
+ * movimiento PURCHASE. Pensada para llamarse dentro de la transacción de
+ * `purchases/service.ts` (por eso recibe `tx` ya abierto).
+ */
+export async function receivePurchaseQuantity(
+  tx: Pick<ScopedPrisma, "inventoryBalance" | "inventoryMovement">,
+  companyId: string,
+  userId: string,
+  input: {
+    variantId: string;
+    warehouseId: string;
+    quantity: number;
+    unitCost: number;
+    purchaseId: string;
+  },
+) {
+  const existing = await tx.inventoryBalance.findUnique({
+    where: {
+      productVariantId_warehouseId: {
+        productVariantId: input.variantId,
+        warehouseId: input.warehouseId,
+      },
+    },
+  });
+
+  const qtyBefore = existing?.quantity ?? 0;
+  const costBefore = Number(existing?.averageCost ?? 0);
+  const qtyAfter = qtyBefore + input.quantity;
+  const newAverageCost = (qtyBefore * costBefore + input.quantity * input.unitCost) / qtyAfter;
+
+  if (existing) {
+    await tx.inventoryBalance.update({
+      where: { id: existing.id },
+      data: { quantity: qtyAfter, averageCost: newAverageCost },
+    });
+  } else {
+    await tx.inventoryBalance.create({
+      data: {
+        companyId,
+        productVariantId: input.variantId,
+        warehouseId: input.warehouseId,
+        quantity: qtyAfter,
+        averageCost: newAverageCost,
+      },
+    });
+  }
+
+  return tx.inventoryMovement.create({
+    data: {
+      companyId,
+      productVariantId: input.variantId,
+      warehouseId: input.warehouseId,
+      type: "PURCHASE",
+      quantity: input.quantity,
+      stockBefore: qtyBefore,
+      stockAfter: qtyAfter,
+      unitCost: input.unitCost,
+      totalValue: input.unitCost * input.quantity,
+      relatedDocumentType: "PURCHASE",
+      relatedDocumentId: input.purchaseId,
+      reason: "Recepción de compra",
+      userId,
+    },
   });
 }
 

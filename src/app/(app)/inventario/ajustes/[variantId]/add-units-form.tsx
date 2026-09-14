@@ -44,13 +44,19 @@ type Warehouse = { id: string; name: string };
 export function AddUnitsForm({
   variantId,
   warehouses,
+  purchaseId,
+  purchaseItemId,
+  defaultCost,
 }: {
   variantId: string;
   warehouses: Warehouse[];
+  purchaseId?: string;
+  purchaseItemId?: string;
+  defaultCost?: string;
 }) {
   const formId = useId();
   const [state, action, pending] = useActionState(addSerializedUnitsAction, undefined);
-  const [rows, setRows] = useState<Row[]>([emptyRow({})]);
+  const [rows, setRows] = useState<Row[]>([emptyRow({ cost: defaultCost ?? "" })]);
   const [pasteText, setPasteText] = useState("");
   const [warehouseId, setWarehouseId] = useState(warehouses[0]?.id ?? "");
 
@@ -99,6 +105,8 @@ export function AddUnitsForm({
     <form action={handleSubmit} className="flex flex-col gap-4">
       <input type="hidden" name="variantId" value={variantId} />
       <input type="hidden" name="warehouseId" value={warehouseId} />
+      {purchaseId && <input type="hidden" name="purchaseId" value={purchaseId} />}
+      {purchaseItemId && <input type="hidden" name="purchaseItemId" value={purchaseItemId} />}
 
       <div className="flex flex-col gap-1.5 sm:w-48">
         <Label>Almacén</Label>
@@ -251,7 +259,12 @@ export function AddUnitsForm({
         variant="outline"
         size="sm"
         className="w-fit"
-        onClick={() => setRows((prev) => [...prev, emptyRow({ condition: prev[0]?.condition })])}
+        onClick={() =>
+          setRows((prev) => [
+            ...prev,
+            emptyRow({ condition: prev[0]?.condition, cost: defaultCost ?? "" }),
+          ])
+        }
       >
         + Agregar fila
       </Button>
