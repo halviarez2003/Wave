@@ -321,16 +321,17 @@ antes de programar nada) y lo que realmente se construyó:
   explícito de nunca hacer un `groupBy` directo sobre un modelo sin
   `companyId` propio (`SaleItem`) — se agrega en JS a partir de una
   consulta a `Sale` que sí está acotada.
+- **Configuración (`users/`, `roles/`)**: pantalla de gestión de usuarios
+  (crear, cambiar rol/estado, restablecer contraseña — bajo `users.manage`,
+  con guarda contra auto-desactivación) y de roles/permisos (crear rol,
+  editar el set completo de permisos de cualquier rol, incluidos los de
+  semilla — bajo `settings.manage`). Como los permisos se cachean en el
+  JWT al iniciar sesión (`src/auth.ts`), un cambio de rol o de permisos no
+  afecta una sesión ya abierta; la UI lo avisa explícitamente. Cierra el
+  gap que quedaba anotado aquí desde el cierre de la Fase 16.
 
 ### Gaps conocidos (no resueltos, deliberadamente fuera de alcance)
 
-- **No hay pantalla de "Configuración"** para gestionar usuarios, roles o
-  permisos desde la UI (el menú original la contemplaba). `Role`/
-  `Permission`/`RolePermission` existen y se siembran correctamente, y
-  cada acción del servidor sí comprueba el permiso — pero hoy la única
-  forma de crear un usuario o reasignar permisos es directo en la base.
-  Categorías/atributos de producto sí tienen su UI (bajo `settings.manage`)
-  porque eran necesarias para el catálogo mismo.
 - **`AuditLog`** existe en el schema pero ningún `service.ts` escribe en
   él todavía; no hay antes/después registrado de las acciones importantes
   más allá de lo que ya queda implícito en el ledger de movimientos.

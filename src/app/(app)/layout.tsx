@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { requireSession } from "@/lib/dal";
+import { hasPermission, requireSession } from "@/lib/dal";
 import { Button } from "@/components/ui/button";
 
 import { logout } from "./actions";
@@ -24,6 +24,8 @@ const NAV_LINKS = [
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await requireSession();
+  const showConfig = hasPermission(session, "users.manage") || hasPermission(session, "settings.manage");
+  const navLinks = showConfig ? [...NAV_LINKS, { href: "/configuracion", label: "Configuración" }] : NAV_LINKS;
 
   return (
     <div className="flex min-h-svh flex-col">
@@ -31,7 +33,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
           <span className="text-sm font-semibold">Wave</span>
           <nav className="flex flex-wrap gap-4">
-            {NAV_LINKS.map((link) => (
+            {navLinks.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
