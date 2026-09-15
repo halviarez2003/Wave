@@ -6,7 +6,7 @@ import * as financeService from "@/server/modules/finance/service";
 import { nextDocumentNumber } from "@/server/modules/shared/document-sequence";
 import { defaultDueDate, daysOverdue, effectiveStatus } from "@/server/modules/shared/credit-terms";
 
-import type { createPurchaseSchema, payPayableSchema } from "./schema";
+import type { createPurchaseSchema, payPayableSchema, voidPurchaseSchema } from "./schema";
 import type { z } from "zod";
 
 export async function listPurchases(db: ScopedPrisma) {
@@ -245,4 +245,142 @@ export async function listPayables(db: ScopedPrisma, status: PayableStatusFilter
   };
 
   return { rows: filtered, totals };
+}
+
+/**
+ * Anula una compra completada: nunca borra la compra ni sus líneas.
+ * Para cantidad, revierte el costo promedio ponderado con la fórmula
+ * inversa a la de recepción — exige que quede stock suficiente de esa
+ * variante (si ya se vendió parte, el costeo promedio perdió
+ * trazabilidad de lote y no se puede revertir con certeza, así que se
+ * bloquea en vez de adivinar). Para serializados, exige que ninguna
+ * unidad de esa línea se haya vendido; las que siguen disponibles
+ * pasan a RETURNED (no hay un estado "anulado" propio en el enum).
+ * Igual que en ventas, se bloquea si ya se pagó parte de la cuenta por
+ * pagar.
+ */
+export async function voidPurchase(
+  db: ScopedPrisma,
+  companyId: string,
+  userId: string,
+  input: z.infer<typeof voidPurchaseSchema>,
+) {
+  return db.$transaction(async (tx) => {
+    const purchase = await tx.purchase.findUniqueOrThrow({
+      where: { id: input.purchaseId },
+      include: {
+        items: { include: { variant: { include: { product: true } }, inventoryUnits: true } },
+        payments: true,
+        payable: true,
+      },
+    });
+
+    if (purchase.status === "VOIDED") {
+      throw new Error("Esta compra ya está anulada.");
+    }
+    if (purchase.payable && Number(purchase.payable.paidAmount) > 0) {
+      throw new Error("No se puede anular: ya se pagó parte de la cuenta por pagar de esta compra.");
+    }
+
+    for (const item of purchase.items) {
+      if (item.variant.product.inventoryType === "QUANTITY") {
+        const balance = await tx.inventoryBalance.findUniqueOrThrow({
+          where: {
+            productVariantId_warehouseId: {
+              productVariantId: item.productVariantId,
+              warehouseId: purchase.warehouseId,
+            },
+          },
+        });
+        if (balance.quantity < item.quantity) {
+          throw new Error(
+            `No queda stock suficiente de "${item.variant.label}" para anular esta línea (parte ya se vendió o se movió).`,
+          );
+        }
+
+        const newQuantity = balance.quantity - item.quantity;
+        const newAverageCost =
+          newQuantity === 0
+            ? 0
+            : (balance.quantity * Number(balance.averageCost) - item.quantity * Number(item.unitCost)) /
+              newQuantity;
+
+        await tx.inventoryBalance.update({
+          where: { id: balance.id },
+          data: { quantity: newQuantity, averageCost: newAverageCost },
+        });
+
+        await tx.inventoryMovement.create({
+          data: {
+            companyId,
+            productVariantId: item.productVariantId,
+            warehouseId: purchase.warehouseId,
+            type: "VOID_PURCHASE",
+            quantity: item.quantity,
+            stockBefore: balance.quantity,
+            stockAfter: newQuantity,
+            unitCost: Number(item.unitCost),
+            totalValue: Number(item.unitCost) * item.quantity,
+            relatedDocumentType: "PURCHASE",
+            relatedDocumentId: purchase.id,
+            reason: `Anulación compra #${purchase.number}: ${input.reason}`,
+            userId,
+          },
+        });
+      } else {
+        for (const unit of item.inventoryUnits) {
+          if (unit.status !== "AVAILABLE") {
+            throw new Error(
+              `Una unidad de "${item.variant.label}" ya no está disponible; no se puede anular esta línea.`,
+            );
+          }
+        }
+        for (const unit of item.inventoryUnits) {
+          await tx.inventoryUnit.update({ where: { id: unit.id }, data: { status: "RETURNED" } });
+          await tx.inventoryMovement.create({
+            data: {
+              companyId,
+              productVariantId: item.productVariantId,
+              inventoryUnitId: unit.id,
+              warehouseId: unit.warehouseId,
+              type: "VOID_PURCHASE",
+              quantity: 1,
+              stockBefore: 1,
+              stockAfter: 0,
+              unitCost: Number(unit.cost),
+              totalValue: Number(unit.cost),
+              relatedDocumentType: "PURCHASE",
+              relatedDocumentId: purchase.id,
+              reason: `Anulación compra #${purchase.number}: ${input.reason}`,
+              userId,
+            },
+          });
+        }
+      }
+    }
+
+    for (const payment of purchase.payments) {
+      await financeService.recordTransaction(tx, companyId, {
+        accountId: payment.accountId,
+        type: "ADJUSTMENT",
+        amount: Number(payment.amount),
+        relatedDocumentType: "PURCHASE",
+        relatedDocumentId: purchase.id,
+        description: `Anulación compra #${purchase.number}: ${input.reason}`,
+        userId,
+      });
+    }
+
+    if (purchase.payable) {
+      await tx.accountPayable.update({
+        where: { id: purchase.payable.id },
+        data: { totalAmount: 0, balance: 0, status: "PAID" },
+      });
+    }
+
+    return tx.purchase.update({
+      where: { id: purchase.id },
+      data: { status: "VOIDED", voidedAt: new Date(), voidReason: input.reason },
+    });
+  });
 }

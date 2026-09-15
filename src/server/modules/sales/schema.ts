@@ -33,5 +33,10 @@ export const payReceivableSchema = z.object({
   amount: z.coerce.number().positive({ error: "Debe ser mayor a 0" }),
 });
 
+export const voidSaleSchema = z.object({
+  saleId: z.string().min(1),
+  reason: z.string().trim().min(1, { error: "Indica un motivo" }).max(500),
+});
+
 export type SaleLine = z.infer<typeof saleLineSchema>;
 export type SalePaymentLine = z.infer<typeof salePaymentLineSchema>;

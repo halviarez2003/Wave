@@ -1,13 +1,14 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { requireSession } from "@/lib/dal";
+import { hasPermission, requireSession } from "@/lib/dal";
 import { getScopedPrisma } from "@/lib/prisma";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import * as purchasesService from "@/server/modules/purchases/service";
 
 import { PayPayableForm } from "./pay-payable-form";
+import { VoidPurchaseForm } from "./void-purchase-form";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +31,7 @@ export default async function PurchaseDetailPage({
   // Los Client Components no pueden recibir Decimal como prop; el
   // formulario de pago solo necesita id/nombre para el selector.
   const accounts = accountRows.map((a) => ({ id: a.id, name: a.name }));
+  const canVoid = hasPermission(session, "purchases.void");
 
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 px-6 py-10">
@@ -37,7 +39,13 @@ export default async function PurchaseDetailPage({
         <Link href="/compras" className="text-muted-foreground text-sm hover:underline">
           ← Compras
         </Link>
-        <h1 className="mt-1 text-xl font-semibold tracking-tight">Compra #{purchase.number}</h1>
+        <div className="mt-1 flex items-center gap-2">
+          <h1 className="text-xl font-semibold tracking-tight">Compra #{purchase.number}</h1>
+          {purchase.status === "VOIDED" && <Badge variant="destructive">Anulada</Badge>}
+        </div>
+        {purchase.status === "VOIDED" && purchase.voidReason && (
+          <p className="text-destructive text-sm">Motivo: {purchase.voidReason}</p>
+        )}
         <p className="text-muted-foreground text-sm">
           <Link href={`/proveedores/${purchase.supplier.id}`} className="underline">
             {purchase.supplier.name}
@@ -147,6 +155,12 @@ export default async function PurchaseDetailPage({
           balance={Number(purchase.payable.balance)}
           accounts={accounts}
         />
+      )}
+
+      {purchase.status === "COMPLETED" && canVoid && (
+        <div>
+          <VoidPurchaseForm purchaseId={purchase.id} purchaseNumber={purchase.number} />
+        </div>
       )}
     </main>
   );

@@ -22,4 +22,9 @@ export const payPayableSchema = z.object({
   amount: z.coerce.number().positive({ error: "Debe ser mayor a 0" }),
 });
 
+export const voidPurchaseSchema = z.object({
+  purchaseId: z.string().min(1),
+  reason: z.string().trim().min(1, { error: "Indica un motivo" }).max(500),
+});
+
 export type PurchaseLine = z.infer<typeof purchaseLineSchema>;

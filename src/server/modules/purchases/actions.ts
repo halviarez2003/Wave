@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/dal";
 import { getScopedPrisma } from "@/lib/prisma";
 
-import { createPurchaseSchema, payPayableSchema } from "./schema";
+import { createPurchaseSchema, payPayableSchema, voidPurchaseSchema } from "./schema";
 import * as purchasesService from "./service";
 
 export type ActionState = { error?: string; success?: string } | undefined;
@@ -80,4 +80,31 @@ export async function payPayableAction(
   revalidatePath("/proveedores");
   revalidatePath("/cuentas/por-pagar");
   return { success: "Pago registrado." };
+}
+
+export async function voidPurchaseAction(
+  _prevState: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const session = await requirePermission("purchases.void");
+  const parsed = voidPurchaseSchema.safeParse({
+    purchaseId: formData.get("purchaseId"),
+    reason: formData.get("reason"),
+  });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
+  }
+
+  const db = getScopedPrisma(session.user.companyId);
+  try {
+    await purchasesService.voidPurchase(db, session.user.companyId, session.user.id, parsed.data);
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "No se pudo anular la compra." };
+  }
+
+  revalidatePath(`/compras/${parsed.data.purchaseId}`);
+  revalidatePath("/compras");
+  revalidatePath("/cuentas");
+  revalidatePath("/cuentas/por-pagar");
+  return { success: "Compra anulada." };
 }

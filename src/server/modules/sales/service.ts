@@ -5,7 +5,7 @@ import * as financeService from "@/server/modules/finance/service";
 import { nextDocumentNumber } from "@/server/modules/shared/document-sequence";
 import { defaultDueDate, daysOverdue, effectiveStatus } from "@/server/modules/shared/credit-terms";
 
-import type { createSaleSchema, payReceivableSchema } from "./schema";
+import type { createSaleSchema, payReceivableSchema, voidSaleSchema } from "./schema";
 import type { z } from "zod";
 
 export async function listSellableItems(db: ScopedPrisma) {
@@ -390,4 +390,122 @@ export async function listReceivables(db: ScopedPrisma, status: ReceivableStatus
   };
 
   return { rows: filtered, totals };
+}
+
+/**
+ * Anula una venta completada: nunca borra la venta ni sus líneas
+ * (docs/01-arquitectura.md, principio de integridad — las anulaciones
+ * generan movimientos inversos). Reversa cada línea de inventario
+ * (devuelve la cantidad al balance o la unidad serializada a
+ * AVAILABLE) con un InventoryMovement VOID_SALE, y reversa cada pago
+ * con un FinancialTransaction de ajuste. Si ya se cobró algo de la
+ * cuenta por cobrar, se bloquea — no hay todavía un flujo para
+ * "descobrar", así que anular dejaría el dinero cobrado sin respaldo.
+ */
+export async function voidSale(
+  db: ScopedPrisma,
+  companyId: string,
+  userId: string,
+  input: z.infer<typeof voidSaleSchema>,
+) {
+  return db.$transaction(async (tx) => {
+    const sale = await tx.sale.findUniqueOrThrow({
+      where: { id: input.saleId },
+      include: { items: true, payments: true, receivable: true },
+    });
+
+    if (sale.status === "VOIDED") {
+      throw new Error("Esta venta ya está anulada.");
+    }
+    if (sale.receivable && Number(sale.receivable.paidAmount) > 0) {
+      throw new Error(
+        "No se puede anular: ya se cobró parte de la cuenta por cobrar de esta venta.",
+      );
+    }
+
+    for (const item of sale.items) {
+      if (item.inventoryUnitId) {
+        const claimed = await tx.inventoryUnit.updateMany({
+          where: { id: item.inventoryUnitId, status: "SOLD" },
+          data: { status: "AVAILABLE" },
+        });
+        if (claimed.count === 0) {
+          throw new Error("Una de las unidades vendidas ya no está en estado 'Vendida'; no se puede anular.");
+        }
+        const unit = await tx.inventoryUnit.findUniqueOrThrow({ where: { id: item.inventoryUnitId } });
+        await tx.inventoryMovement.create({
+          data: {
+            companyId,
+            productVariantId: item.productVariantId,
+            inventoryUnitId: unit.id,
+            warehouseId: unit.warehouseId,
+            type: "VOID_SALE",
+            quantity: 1,
+            stockBefore: 0,
+            stockAfter: 1,
+            unitCost: Number(item.unitCost),
+            totalValue: Number(item.unitCost),
+            relatedDocumentType: "SALE",
+            relatedDocumentId: sale.id,
+            reason: `Anulación venta #${sale.number}: ${input.reason}`,
+            userId,
+          },
+        });
+      } else {
+        const balance = await tx.inventoryBalance.findUniqueOrThrow({
+          where: {
+            productVariantId_warehouseId: {
+              productVariantId: item.productVariantId,
+              warehouseId: sale.warehouseId,
+            },
+          },
+        });
+        await tx.inventoryBalance.update({
+          where: { id: balance.id },
+          data: { quantity: { increment: item.quantity } },
+        });
+        await tx.inventoryMovement.create({
+          data: {
+            companyId,
+            productVariantId: item.productVariantId,
+            warehouseId: sale.warehouseId,
+            type: "VOID_SALE",
+            quantity: item.quantity,
+            stockBefore: balance.quantity,
+            stockAfter: balance.quantity + item.quantity,
+            unitCost: Number(item.unitCost),
+            totalValue: Number(item.unitCost) * item.quantity,
+            relatedDocumentType: "SALE",
+            relatedDocumentId: sale.id,
+            reason: `Anulación venta #${sale.number}: ${input.reason}`,
+            userId,
+          },
+        });
+      }
+    }
+
+    for (const payment of sale.payments) {
+      await financeService.recordTransaction(tx, companyId, {
+        accountId: payment.accountId,
+        type: "ADJUSTMENT",
+        amount: -Number(payment.amount),
+        relatedDocumentType: "SALE",
+        relatedDocumentId: sale.id,
+        description: `Anulación venta #${sale.number}: ${input.reason}`,
+        userId,
+      });
+    }
+
+    if (sale.receivable) {
+      await tx.accountReceivable.update({
+        where: { id: sale.receivable.id },
+        data: { totalAmount: 0, balance: 0, status: "PAID" },
+      });
+    }
+
+    return tx.sale.update({
+      where: { id: sale.id },
+      data: { status: "VOIDED", voidedAt: new Date(), voidReason: input.reason },
+    });
+  });
 }

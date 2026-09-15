@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { hasPermission, requirePermission } from "@/lib/dal";
 import { getScopedPrisma } from "@/lib/prisma";
 
-import { createSaleSchema, payReceivableSchema } from "./schema";
+import { createSaleSchema, payReceivableSchema, voidSaleSchema } from "./schema";
 import * as salesService from "./service";
 
 export type ActionState = { error?: string; success?: string } | undefined;
@@ -84,4 +84,31 @@ export async function payReceivableAction(
   revalidatePath("/clientes");
   revalidatePath("/cuentas/por-cobrar");
   return { success: "Cobro registrado." };
+}
+
+export async function voidSaleAction(
+  _prevState: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const session = await requirePermission("sales.void");
+  const parsed = voidSaleSchema.safeParse({
+    saleId: formData.get("saleId"),
+    reason: formData.get("reason"),
+  });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
+  }
+
+  const db = getScopedPrisma(session.user.companyId);
+  try {
+    await salesService.voidSale(db, session.user.companyId, session.user.id, parsed.data);
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "No se pudo anular la venta." };
+  }
+
+  revalidatePath(`/ventas/${parsed.data.saleId}`);
+  revalidatePath("/ventas");
+  revalidatePath("/cuentas");
+  revalidatePath("/cuentas/por-cobrar");
+  return { success: "Venta anulada." };
 }

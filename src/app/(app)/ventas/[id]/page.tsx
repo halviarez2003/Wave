@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import * as salesService from "@/server/modules/sales/service";
 
 import { PayReceivableForm } from "./pay-receivable-form";
+import { VoidSaleForm } from "./void-sale-form";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +31,7 @@ export default async function SaleDetailPage({
   const accounts = accountRows.map((a) => ({ id: a.id, name: a.name }));
   const canViewCosts = hasPermission(session, "costs.view");
   const canCollect = hasPermission(session, "sales.collect");
+  const canVoid = hasPermission(session, "sales.void");
 
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 px-6 py-10">
@@ -37,7 +39,13 @@ export default async function SaleDetailPage({
         <Link href="/ventas" className="text-muted-foreground text-sm hover:underline">
           ← Ventas
         </Link>
-        <h1 className="mt-1 text-xl font-semibold tracking-tight">Venta #{sale.number}</h1>
+        <div className="mt-1 flex items-center gap-2">
+          <h1 className="text-xl font-semibold tracking-tight">Venta #{sale.number}</h1>
+          {sale.status === "VOIDED" && <Badge variant="destructive">Anulada</Badge>}
+        </div>
+        {sale.status === "VOIDED" && sale.voidReason && (
+          <p className="text-destructive text-sm">Motivo: {sale.voidReason}</p>
+        )}
         <p className="text-muted-foreground text-sm">
           {sale.customer ? (
             <Link href={`/clientes/${sale.customer.id}`} className="underline">
@@ -148,6 +156,12 @@ export default async function SaleDetailPage({
             Saldo pendiente de cobro: ${Number(sale.receivable.balance).toFixed(2)}
           </Badge>
         )
+      )}
+
+      {sale.status === "COMPLETED" && canVoid && (
+        <div>
+          <VoidSaleForm saleId={sale.id} saleNumber={sale.number} />
+        </div>
       )}
     </main>
   );
