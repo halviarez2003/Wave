@@ -42,6 +42,14 @@ Expense —1 FinancialTransaction
 > (cliente ESM con `output` explícito), confirmado con `prisma migrate dev`
 > contra Postgres local.
 
+> Nota (Fase 16 — revisión completa): este documento es el borrador de
+> diseño original y no se fue actualizando línea por línea en cada fase
+> posterior; **`prisma/schema.prisma` es la fuente de verdad real** (con
+> su historial de migraciones en `prisma/migrations/`). En caso de
+> discrepancia, gana el schema real. Lo que sí se mantuvo al día es
+> `docs/01-arquitectura.md`, con una nota de "Corrección (Fase N)" cada
+> vez que la implementación se apartó de lo planeado aquí.
+
 ```prisma
 generator client {
   provider = "prisma-client"

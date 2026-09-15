@@ -265,3 +265,75 @@ Casos obligatorios: costo promedio, costo individual, venta serializada,
 venta por cantidad, pagos parciales, transferencias, anulación de venta y
 compra, valorización de inventario, IMEI/serial duplicado — igual a la lista
 del brief (sección 58).
+
+> Corrección (Fase 15): no se usó rollback de transacción por test. Los
+> servicios llaman a `db.$transaction(...)` internamente, y un `tx` de
+> Prisma dentro de esa transacción no expone `$transaction` (por eso ya
+> existía el workaround de tipar helpers como `Pick<ScopedPrisma, ...>`,
+> sección 4.3) — envolver cada test en su propia transacción externa habría
+> chocado con eso. En su lugar, cada archivo de test crea su propia
+> "empresa" aislada con un sufijo único (`tests/fixtures.ts`), igual que ya
+> hacían los scripts de Playroom de fases anteriores: el aislamiento lo da
+> el multi-tenant scoping mismo, no un rollback. `server-only` se resuelve
+> a un módulo vacío vía alias en `vitest.config.ts` (Next.js lo reemplaza
+> así fuera de un Server Component; Vitest no tiene ese compilador).
+
+## 7. Estado final vs. plan original (Fase 16 — revisión completa)
+
+Las 16 fases se completaron. Diferencias entre este documento (escrito
+antes de programar nada) y lo que realmente se construyó:
+
+- **Estructura de módulos real**: `purchasing`, `receivables` y `payables`
+  no son módulos separados — viven dentro de `sales/` (`AccountReceivable`,
+  `payReceivable`, `voidSale`) y `purchases/` (`AccountPayable`,
+  `payPayable`, `voidPurchase`), porque una cuenta por cobrar/pagar no
+  existe sin la venta/compra que la origina y comparte su transacción.
+  `dashboard/` y `reports/` sí terminaron siendo módulos propios de solo
+  lectura, como se planeaba para `reports/`. No hay módulo `audit/` — el
+  `AuditLog` del schema quedó sin una UI ni un writer dedicados (ver gaps
+  abajo).
+- **Bloqueo de fila**: no se usó `SELECT ... FOR UPDATE` en ningún lado.
+  Todas las operaciones concurrentes sensibles (vender la última unidad,
+  descontar el último stock) usan el patrón *update guardado atómico*
+  (`updateMany({ where: { id, quantity: { gte: X } }, data: { quantity: {
+  decrement: X } } })` o `updateMany({ where: { id, status: "AVAILABLE" },
+  data: { status: "SOLD" } })`) — el `count` de filas afectadas dice si la
+  condición seguía vigente. Postgres serializa esto sin necesitar un lock
+  manual ni una transacción interactiva más larga.
+- **Anulaciones**: se implementaron en la Fase 15 (no tenían fase propia
+  en el plan de 16 fases, pero el brief y esta misma sección las pedían).
+  `voidSale`/`voidPurchase` marcan `status: VOIDED` + `voidReason` sobre el
+  documento original — nunca se crea una "venta reversa" como `Sale` nueva
+  (a diferencia de lo que decía la sección 5 original); el reverso vive en
+  los `InventoryMovement`/`FinancialTransaction` nuevos que sí referencian
+  el documento anulado. Limitaciones deliberadas: anular se bloquea si ya
+  se cobró/pagó parte de la cuenta por cobrar/pagar (no existe un flujo de
+  "descobrar"), y anular una compra por cantidad se bloquea si ya no queda
+  stock suficiente (el costeo promedio pierde trazabilidad de lote en
+  cuanto se vendió parte — revertir a ciegas ahí sería adivinar, no
+  calcular).
+- **Fases 11-14 (no estaban en este documento original)**: cuentas por
+  cobrar/pagar con estado `OVERDUE` derivado en el momento de leer (nunca
+  persistido — se compara `balance`/`dueDate` contra "ahora" en
+  `shared/credit-terms.ts`, evitando depender de un cron); gastos
+  (`expenses/`); dashboard con "Mi Dinero"/"Mi Inventario"/"Capital
+  Controlado"; reportes con rango de fechas. Todas llevan cuidado
+  explícito de nunca hacer un `groupBy` directo sobre un modelo sin
+  `companyId` propio (`SaleItem`) — se agrega en JS a partir de una
+  consulta a `Sale` que sí está acotada.
+
+### Gaps conocidos (no resueltos, deliberadamente fuera de alcance)
+
+- **No hay pantalla de "Configuración"** para gestionar usuarios, roles o
+  permisos desde la UI (el menú original la contemplaba). `Role`/
+  `Permission`/`RolePermission` existen y se siembran correctamente, y
+  cada acción del servidor sí comprueba el permiso — pero hoy la única
+  forma de crear un usuario o reasignar permisos es directo en la base.
+  Categorías/atributos de producto sí tienen su UI (bajo `settings.manage`)
+  porque eran necesarias para el catálogo mismo.
+- **`AuditLog`** existe en el schema pero ningún `service.ts` escribe en
+  él todavía; no hay antes/después registrado de las acciones importantes
+  más allá de lo que ya queda implícito en el ledger de movimientos.
+- **No hay un flujo de "descobrar"/"despagar"** una cuenta por cobrar o
+  pagar, lo que en la práctica bloquea anular una venta/compra una vez que
+  se cobró/pagó cualquier parte de su saldo (ver arriba).
