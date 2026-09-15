@@ -25,6 +25,7 @@ const TENANT_MODELS = new Set([
   "Category",
   "AttributeDefinition",
   "Product",
+  "ProductVariant",
   "Warehouse",
   "InventoryBalance",
   "InventoryUnit",

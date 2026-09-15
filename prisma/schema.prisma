@@ -30,6 +30,7 @@ model Company {
   roles                 Role[]
   categories            Category[]
   products              Product[]
+  productVariants       ProductVariant[]
   warehouses            Warehouse[]
   customers             Customer[]
   suppliers             Supplier[]
@@ -256,6 +257,7 @@ model Product {
 
 model ProductVariant {
   id        String   @id @default(cuid())
+  companyId String // desnormalizado desde Product.companyId — ver docs/01-arquitectura.md, gap corregido en Fase 16: sin esto, ProductVariant quedaba fuera del scoping multi-tenant de getScopedPrisma() y una consulta directa por id (picker de productos, kardex por URL, líneas de venta/compra) podía leer o referenciar variantes de otra empresa.
   productId String
   label     String // "256GB / Titanio", o "Único"
   sku       String?
@@ -265,6 +267,7 @@ model ProductVariant {
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
 
+  company Company @relation(fields: [companyId], references: [id])
   product Product @relation(fields: [productId], references: [id])
 
   attributeValues    ProductAttributeValue[]
@@ -275,6 +278,7 @@ model ProductVariant {
   purchaseItems      PurchaseItem[]
 
   @@unique([productId, sku])
+  @@index([companyId])
   @@index([sku])
   @@index([barcode])
   @@map("product_variants")

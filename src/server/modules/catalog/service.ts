@@ -162,6 +162,7 @@ export async function createProduct(
 
     const variant = await tx.productVariant.create({
       data: {
+        companyId,
         productId: product.id,
         label: "Único",
         sku: input.sku,
