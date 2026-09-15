@@ -18,6 +18,7 @@ const NAV_LINKS = [
   { href: "/ventas", label: "Ventas" },
   { href: "/clientes", label: "Clientes" },
   { href: "/cuentas", label: "Cuentas" },
+  { href: "/gastos", label: "Gastos" },
 ];
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
