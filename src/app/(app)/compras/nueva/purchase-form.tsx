@@ -35,7 +35,14 @@ export function PurchaseForm({
   const [supplierId, setSupplierId] = useState(suppliers[0]?.id ?? "");
   const [warehouseId, setWarehouseId] = useState(warehouses[0]?.id ?? "");
   const [paymentAccountId, setPaymentAccountId] = useState<string>("none");
+  const [paymentAmount, setPaymentAmount] = useState<string>("");
   const [rows, setRows] = useState<Row[]>([emptyRow(variants[0]?.id ?? "")]);
+
+  const defaultDueDateValue = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 30);
+    return d.toISOString().slice(0, 10);
+  }, []);
 
   const total = useMemo(
     () => rows.reduce((sum, r) => sum + (Number(r.quantity) || 0) * (Number(r.unitCost) || 0), 0),
@@ -203,11 +210,19 @@ export function PurchaseForm({
               type="number"
               min="0"
               step="0.01"
-              defaultValue={total.toFixed(2)}
+              value={paymentAmount || total.toFixed(2)}
+              onChange={(e) => setPaymentAmount(e.target.value)}
             />
           </div>
         )}
       </div>
+
+      {total - (paymentAccountId !== "none" ? Number(paymentAmount || total) : 0) > 0.004 && (
+        <div className="border-border flex items-center justify-between gap-4 rounded-lg border p-4">
+          <Label htmlFor="dueDate">Vence el</Label>
+          <Input id="dueDate" name="dueDate" type="date" defaultValue={defaultDueDateValue} className="h-8 w-40" />
+        </div>
+      )}
 
       <div className="flex flex-col gap-1.5">
         <Label htmlFor={`${formId}-notes`}>Notas (opcional)</Label>

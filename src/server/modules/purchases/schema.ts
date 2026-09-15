@@ -13,6 +13,7 @@ export const createPurchaseSchema = z.object({
   items: z.array(purchaseLineSchema).min(1, { error: "Agrega al menos un producto" }),
   paymentAccountId: z.string().optional(),
   paymentAmount: z.coerce.number().nonnegative().optional(),
+  dueDate: z.coerce.date().optional(),
 });
 
 export const payPayableSchema = z.object({

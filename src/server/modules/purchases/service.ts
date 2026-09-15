@@ -4,6 +4,7 @@ import type { ScopedPrisma } from "@/lib/prisma";
 import * as inventoryService from "@/server/modules/inventory/service";
 import * as financeService from "@/server/modules/finance/service";
 import { nextDocumentNumber } from "@/server/modules/shared/document-sequence";
+import { defaultDueDate, daysOverdue, effectiveStatus } from "@/server/modules/shared/credit-terms";
 
 import type { createPurchaseSchema, payPayableSchema } from "./schema";
 import type { z } from "zod";
@@ -141,6 +142,7 @@ export async function createPurchase(
           totalAmount: total,
           paidAmount: paidTotal,
           balance: balanceDue,
+          dueDate: input.dueDate ?? defaultDueDate(),
           status: paidTotal > 0 ? "PARTIAL" : "PENDING",
         },
       });
@@ -205,4 +207,42 @@ export async function payPayable(
 
     return financialTransaction;
   });
+}
+
+export type PayableStatusFilter = "ALL" | "PENDING" | "PARTIAL" | "OVERDUE" | "PAID";
+
+export async function listPayables(db: ScopedPrisma, status: PayableStatusFilter = "ALL") {
+  const payables = await db.accountPayable.findMany({
+    where: { status: { not: "PAID" } },
+    include: { supplier: true, purchase: true },
+    orderBy: { issueDate: "asc" },
+  });
+
+  const rows = payables.map((p) => {
+    const balance = Number(p.balance);
+    const status = effectiveStatus(p.status, balance, p.dueDate);
+    return {
+      id: p.id,
+      supplier: p.supplier,
+      purchaseId: p.purchaseId,
+      purchaseNumber: p.purchase.number,
+      totalAmount: Number(p.totalAmount),
+      paidAmount: Number(p.paidAmount),
+      balance,
+      issueDate: p.issueDate,
+      dueDate: p.dueDate,
+      daysOverdue: daysOverdue(p.dueDate),
+      status,
+    };
+  });
+
+  const filtered = status === "ALL" ? rows : rows.filter((p) => p.status === status);
+
+  const totals = {
+    pending: rows.reduce((sum, p) => sum + p.balance, 0),
+    overdue: rows.filter((p) => p.status === "OVERDUE").reduce((sum, p) => sum + p.balance, 0),
+    supplierCount: new Set(rows.map((p) => p.supplier.id)).size,
+  };
+
+  return { rows: filtered, totals };
 }

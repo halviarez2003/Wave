@@ -33,6 +33,7 @@ export async function createSaleAction(
     notes: formData.get("notes") || undefined,
     items,
     payments,
+    dueDate: formData.get("dueDate") || undefined,
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
@@ -81,5 +82,6 @@ export async function payReceivableAction(
 
   revalidatePath(`/ventas/${saleId}`);
   revalidatePath("/clientes");
+  revalidatePath("/cuentas/por-cobrar");
   return { success: "Cobro registrado." };
 }

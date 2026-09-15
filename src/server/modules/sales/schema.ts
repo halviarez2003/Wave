@@ -24,6 +24,7 @@ export const createSaleSchema = z.object({
   notes: z.string().trim().max(500).optional(),
   items: z.array(saleLineSchema).min(1, { error: "Agrega al menos un producto" }),
   payments: z.array(salePaymentLineSchema).optional(),
+  dueDate: z.coerce.date().optional(),
 });
 
 export const payReceivableSchema = z.object({

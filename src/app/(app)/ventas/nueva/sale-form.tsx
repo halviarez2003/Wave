@@ -70,6 +70,12 @@ export function SaleForm({
   const [discount, setDiscount] = useState("0");
   const [payments, setPayments] = useState<PaymentLine[]>([]);
 
+  const defaultDueDateValue = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 30);
+    return d.toISOString().slice(0, 10);
+  }, []);
+
   const results = useMemo(() => {
     if (!query.trim()) return [];
     const cartUnitIds = new Set(cart.map((l) => l.unitId).filter(Boolean));
@@ -371,6 +377,12 @@ export function SaleForm({
         </div>
         {balanceDue > 0.004 && customerId === "none" && (
           <p className="text-warning text-xs">Selecciona un cliente para vender a crédito.</p>
+        )}
+        {balanceDue > 0.004 && customerId !== "none" && (
+          <div className="flex items-center justify-between gap-4 text-sm">
+            <Label htmlFor="dueDate">Vence el</Label>
+            <Input id="dueDate" name="dueDate" type="date" defaultValue={defaultDueDateValue} className="h-8 w-40" />
+          </div>
         )}
       </div>
 

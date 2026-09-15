@@ -31,6 +31,7 @@ export async function createPurchaseAction(
     items,
     paymentAccountId: formData.get("paymentAccountId") || undefined,
     paymentAmount: formData.get("paymentAmount") || undefined,
+    dueDate: formData.get("dueDate") || undefined,
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
@@ -77,5 +78,6 @@ export async function payPayableAction(
 
   revalidatePath(`/compras/${purchaseId}`);
   revalidatePath("/proveedores");
+  revalidatePath("/cuentas/por-pagar");
   return { success: "Pago registrado." };
 }

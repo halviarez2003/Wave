@@ -3,6 +3,7 @@ import "server-only";
 import type { ScopedPrisma } from "@/lib/prisma";
 import * as financeService from "@/server/modules/finance/service";
 import { nextDocumentNumber } from "@/server/modules/shared/document-sequence";
+import { defaultDueDate, daysOverdue, effectiveStatus } from "@/server/modules/shared/credit-terms";
 
 import type { createSaleSchema, payReceivableSchema } from "./schema";
 import type { z } from "zod";
@@ -281,6 +282,7 @@ export async function createSale(
           totalAmount: total,
           paidAmount: paidTotal,
           balance: balanceDue,
+          dueDate: input.dueDate ?? defaultDueDate(),
           status: paidTotal > 0 ? "PARTIAL" : "PENDING",
         },
       });
@@ -345,4 +347,47 @@ export async function payReceivable(
 
     return financialTransaction;
   });
+}
+
+export type ReceivableStatusFilter = "ALL" | "PENDING" | "PARTIAL" | "OVERDUE" | "PAID";
+
+/**
+ * Cuentas por cobrar con estado efectivo (OVERDUE derivado de dueDate,
+ * nunca persistido) y días de atraso. `status` filtra sobre ese estado
+ * efectivo, no sobre la columna cruda.
+ */
+export async function listReceivables(db: ScopedPrisma, status: ReceivableStatusFilter = "ALL") {
+  const receivables = await db.accountReceivable.findMany({
+    where: { status: { not: "PAID" } },
+    include: { customer: true, sale: true },
+    orderBy: { issueDate: "asc" },
+  });
+
+  const rows = receivables.map((r) => {
+    const balance = Number(r.balance);
+    const status = effectiveStatus(r.status, balance, r.dueDate);
+    return {
+      id: r.id,
+      customer: r.customer,
+      saleId: r.saleId,
+      saleNumber: r.sale.number,
+      totalAmount: Number(r.totalAmount),
+      paidAmount: Number(r.paidAmount),
+      balance,
+      issueDate: r.issueDate,
+      dueDate: r.dueDate,
+      daysOverdue: daysOverdue(r.dueDate),
+      status,
+    };
+  });
+
+  const filtered = status === "ALL" ? rows : rows.filter((r) => r.status === status);
+
+  const totals = {
+    pending: rows.reduce((sum, r) => sum + r.balance, 0),
+    overdue: rows.filter((r) => r.status === "OVERDUE").reduce((sum, r) => sum + r.balance, 0),
+    customerCount: new Set(rows.map((r) => r.customer.id)).size,
+  };
+
+  return { rows: filtered, totals };
 }

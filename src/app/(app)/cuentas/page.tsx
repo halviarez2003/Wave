@@ -76,9 +76,17 @@ export default async function CuentasPage() {
         </Table>
       </div>
 
-      <Link href="/cuentas/movimientos" className="text-sm underline">
-        Ver todos los movimientos →
-      </Link>
+      <div className="flex flex-wrap gap-4">
+        <Link href="/cuentas/movimientos" className="text-sm underline">
+          Ver todos los movimientos →
+        </Link>
+        <Link href="/cuentas/por-cobrar" className="text-sm underline">
+          Cuentas por cobrar →
+        </Link>
+        <Link href="/cuentas/por-pagar" className="text-sm underline">
+          Cuentas por pagar →
+        </Link>
+      </div>
     </main>
   );
 }
