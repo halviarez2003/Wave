@@ -7,13 +7,10 @@ import { logout } from "./actions";
 
 const NAV_LINKS = [
   { href: "/", label: "Inicio" },
-  { href: "/inventario/productos", label: "Productos" },
+  { href: "/inventario/productos", label: "Inventario" },
   { href: "/inventario/categorias", label: "Categorías" },
   { href: "/inventario/movimientos", label: "Movimientos" },
   { href: "/inventario/kardex", label: "Kardex" },
-  { href: "/inventario/ajustes", label: "Ajustes" },
-  { href: "/inventario/almacenes", label: "Almacenes" },
-  { href: "/compras", label: "Compras" },
   { href: "/proveedores", label: "Proveedores" },
   { href: "/ventas", label: "Ventas" },
   { href: "/clientes", label: "Clientes" },

@@ -28,9 +28,17 @@ export default async function ProductosPage() {
             {products.length} producto{products.length === 1 ? "" : "s"} en el catálogo.
           </p>
         </div>
-        <Button asChild size="sm">
-          <Link href="/inventario/productos/nuevo">Nuevo producto</Link>
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button asChild size="sm" variant="outline">
+            <Link href="/inventario/ajustes">Ajuste de inventario</Link>
+          </Button>
+          <Button asChild size="sm" variant="outline">
+            <Link href="/compras/nueva">Agregar inventario</Link>
+          </Button>
+          <Button asChild size="sm">
+            <Link href="/inventario/productos/nuevo">Nuevo producto</Link>
+          </Button>
+        </div>
       </div>
 
       <div className="border-border overflow-hidden rounded-lg border">

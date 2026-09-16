@@ -79,7 +79,7 @@ export default async function AjustesDetailPage({
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Almacén</TableHead>
+                  {warehouses.length > 1 && <TableHead>Almacén</TableHead>}
                   <TableHead>Cantidad</TableHead>
                   <TableHead>Costo promedio</TableHead>
                 </TableRow>
@@ -87,15 +87,15 @@ export default async function AjustesDetailPage({
               <TableBody>
                 {variant.inventoryBalances.map((b) => (
                   <TableRow key={b.id}>
-                    <TableCell>{b.warehouse.name}</TableCell>
+                    {warehouses.length > 1 && <TableCell>{b.warehouse.name}</TableCell>}
                     <TableCell className="tabular-nums">{b.quantity}</TableCell>
                     <TableCell className="tabular-nums">${Number(b.averageCost).toFixed(2)}</TableCell>
                   </TableRow>
                 ))}
                 {variant.inventoryBalances.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={3} className="text-muted-foreground text-center py-6">
-                      Sin stock todavía en ningún almacén.
+                    <TableCell colSpan={warehouses.length > 1 ? 3 : 2} className="text-muted-foreground text-center py-6">
+                      Sin stock todavía.
                     </TableCell>
                   </TableRow>
                 )}
@@ -104,7 +104,7 @@ export default async function AjustesDetailPage({
           </div>
 
           <QuantityAdjustForm variantId={variant.id} warehouses={warehouses} />
-          <TransferForm variantId={variant.id} warehouses={warehouses} />
+          {warehouses.length > 1 && <TransferForm variantId={variant.id} warehouses={warehouses} />}
         </>
       ) : (
         <>
@@ -116,7 +116,7 @@ export default async function AjustesDetailPage({
                   <TableHead>Color</TableHead>
                   <TableHead>Batería</TableHead>
                   <TableHead>Costo</TableHead>
-                  <TableHead>Almacén</TableHead>
+                  {warehouses.length > 1 && <TableHead>Almacén</TableHead>}
                   <TableHead>Estado</TableHead>
                 </TableRow>
               </TableHeader>
@@ -129,7 +129,7 @@ export default async function AjustesDetailPage({
                       {u.batteryPercent !== null ? `${u.batteryPercent}%` : "—"}
                     </TableCell>
                     <TableCell className="tabular-nums">${Number(u.cost).toFixed(2)}</TableCell>
-                    <TableCell>{u.warehouse.name}</TableCell>
+                    {warehouses.length > 1 && <TableCell>{u.warehouse.name}</TableCell>}
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <Badge variant={u.status === "AVAILABLE" ? "success" : "secondary"}>
@@ -142,7 +142,7 @@ export default async function AjustesDetailPage({
                 ))}
                 {variant.inventoryUnits.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-muted-foreground text-center py-6">
+                    <TableCell colSpan={warehouses.length > 1 ? 6 : 5} className="text-muted-foreground text-center py-6">
                       Sin unidades todavía.
                     </TableCell>
                   </TableRow>
