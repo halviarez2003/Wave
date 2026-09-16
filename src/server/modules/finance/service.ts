@@ -1,7 +1,7 @@
 import "server-only";
 
 import type { ScopedPrisma } from "@/lib/prisma";
-import type { FinancialTransactionType } from "@/generated/prisma/enums";
+import type { FinancialTransactionType } from "@prisma/client";
 
 import type { createAccountSchema, transferSchema } from "./schema";
 import type { z } from "zod";
