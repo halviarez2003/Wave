@@ -9,6 +9,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  const result = await seedDatabase(prisma);
-  return NextResponse.json({ ok: true, ...result });
+  try {
+    const result = await seedDatabase(prisma);
+    return NextResponse.json({ ok: true, ...result });
+  } catch (error) {
+    return NextResponse.json(
+      { ok: false, error: error instanceof Error ? error.message : String(error) },
+      { status: 500 },
+    );
+  }
 }
