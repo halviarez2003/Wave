@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs";
 
-import type { PrismaClient } from "../src/generated/prisma/client";
+import type { PrismaClient } from "@prisma/client";
 import { DEFAULT_ROLE_PERMISSIONS, PERMISSIONS, SEED_ROLES } from "../src/lib/permissions";
 
 const CATEGORIES: Array<{

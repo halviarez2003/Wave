@@ -52,8 +52,8 @@ Expense —1 FinancialTransaction
 
 ```prisma
 generator client {
-  provider = "prisma-client"
-  output   = "../src/generated/prisma"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
 datasource db {

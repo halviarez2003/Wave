@@ -1,7 +1,7 @@
 import "server-only";
 
 import type { ScopedPrisma } from "@/lib/prisma";
-import type { DocumentType } from "@/generated/prisma/enums";
+import type { DocumentType } from "@prisma/client";
 
 /**
  * Numeración de documentos atómica: un solo UPDATE ... SET nextNumber =
